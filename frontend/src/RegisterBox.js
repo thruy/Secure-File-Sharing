@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { b64 } from "./crypto";
+import { b64, deriveKey } from "./crypto";
 
 function RegisterBox({ SERVER, showLogin }) {
     const [user, setUser] = useState("");
@@ -12,6 +12,7 @@ function RegisterBox({ SERVER, showLogin }) {
             return;
         }
 
+        // 1. Sinh RSA keypair
         const kp = await crypto.subtle.generateKey(
             {
                 name: "RSA-OAEP",
@@ -23,18 +24,33 @@ function RegisterBox({ SERVER, showLogin }) {
             ["encrypt", "decrypt"]
         );
 
-        const priv = await crypto.subtle.exportKey("pkcs8", kp.privateKey);
-        localStorage.setItem("privateKey", b64(new Uint8Array(priv)));
+        // 2. Export keys
+        const privateKeyRaw = await crypto.subtle.exportKey("pkcs8", kp.privateKey);
+        const publicKeyRaw = await crypto.subtle.exportKey("spki", kp.publicKey);
 
-        const pub = await crypto.subtle.exportKey("spki", kp.publicKey);
+        // 3. Derive key từ password
+        const salt = crypto.getRandomValues(new Uint8Array(16));
+        const iv = crypto.getRandomValues(new Uint8Array(12));
+        const aesKey = await deriveKey(pass1, salt);
 
+        // 4. Encrypt private key
+        const encryptedPrivateKey = await crypto.subtle.encrypt(
+            { name: "AES-GCM", iv },
+            aesKey,
+            privateKeyRaw
+        );
+
+        // 5. Gửi lên server
         const res = await fetch(`${SERVER}/register`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
                 username: user.trim(),
                 password: pass1.trim(),
-                publicKey: b64(new Uint8Array(pub)),
+                publicKey: b64(new Uint8Array(publicKeyRaw)),
+                encryptedPrivateKey: b64(new Uint8Array(encryptedPrivateKey)),
+                iv: b64(iv),
+                salt: b64(salt),
             }),
         });
 

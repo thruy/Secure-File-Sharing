@@ -1,6 +1,7 @@
 import { useState } from "react";
+import { u8, deriveKey } from "./crypto";
 
-function LoginBox({ SERVER, onLogin, showRegister }) {
+function LoginBox({ SERVER, onLogin, showRegister, setPrivateKey }) {
     const [user, setUser] = useState("");
     const [pass, setPass] = useState("");
 
@@ -9,8 +10,8 @@ function LoginBox({ SERVER, onLogin, showRegister }) {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
-                username: user.trim(),
-                password: pass.trim(),
+                username: user,
+                password: pass,
             }),
         });
 
@@ -19,9 +20,29 @@ function LoginBox({ SERVER, onLogin, showRegister }) {
             return;
         }
 
-        localStorage.setItem("user", user.trim());
-        onLogin(user.trim());
+        const data = await res.json();
+
+        // giải mã private key
+        const aesKey = await deriveKey(pass, u8(data.salt));
+        const privateKeyRaw = await crypto.subtle.decrypt(
+            { name: "AES-GCM", iv: u8(data.iv) },
+            aesKey,
+            u8(data.encryptedPrivateKey)
+        );
+
+        const privateKey = await crypto.subtle.importKey(
+            "pkcs8",
+            privateKeyRaw,
+            { name: "RSA-OAEP", hash: "SHA-256" },
+            false,
+            ["decrypt"]
+        );
+
+        // lưu privateKey trong memory (NOT localStorage)
+        setPrivateKey(privateKey);
+        onLogin(user);
     };
+
 
     return (
         <div className="card">

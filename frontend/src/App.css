@@ -16,11 +16,14 @@ h2 {
   text-align: center;
 }
 
-input,
-button {
+* {
+  box-sizing: border-box;
+}
+
+input, button {
   width: 100%;
   padding: 10px;
-  margin: 6px 0;
+  margin: 6px 6px;
   font-size: 14px;
 }
 

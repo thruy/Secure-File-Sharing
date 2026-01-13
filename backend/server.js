@@ -2,7 +2,7 @@ const express = require("express");
 const multer = require("multer");
 const cors = require("cors");
 const fs = require("fs");
-
+const bcrypt = require('bcryptjs');
 const app = express();
 app.use(cors());
 app.use(express.json());
@@ -29,29 +29,50 @@ function saveDB(db) {
 }
 
 /* ===== REGISTER ===== */
-app.post("/register", (req, res) => {
-    const username = req.body.username?.trim();
-    const password = req.body.password?.trim();
-    const publicKey = req.body.publicKey;
+app.post("/register", async (req, res) => {
+    const { username, password, publicKey, encryptedPrivateKey, iv, salt } = req.body;
 
-    if (!username || !password || !publicKey) return res.status(400).send("Invalid data");
+    if (!username || !password || !publicKey || !encryptedPrivateKey)
+        return res.status(400).send("Invalid data");
+
     const db = loadDB();
-    if (db.users.find(u => u.username === username)) return res.status(400).send("User exists");
-    db.users.push({ username, password, publicKey });
+    if (db.users.find(u => u.username === username))
+        return res.status(400).send("User exists");
+
+    const passwordHash = await bcrypt.hash(password, 10);
+
+    db.users.push({
+        username,
+        passwordHash,
+        publicKey,
+        encryptedPrivateKey,
+        iv,
+        salt,
+    });
+
     saveDB(db);
     res.send("OK");
 });
 
 /* ===== LOGIN ===== */
-app.post("/login", (req, res) => {
-    const username = req.body.username?.trim();
-    const password = req.body.password?.trim();
-
+app.post("/login", async (req, res) => {
+    const { username, password } = req.body;
     const db = loadDB();
-    const user = db.users.find(u => u.username === username && u.password === password);
-    if (!user) return res.status(401).send("Invalid credentials");
-    res.json({ username });
+
+    const user = db.users.find(u => u.username === username);
+    if (!user) return res.sendStatus(401);
+
+    const ok = await bcrypt.compare(password, user.passwordHash);
+    if (!ok) return res.sendStatus(401);
+
+    res.json({
+        publicKey: user.publicKey,
+        encryptedPrivateKey: user.encryptedPrivateKey,
+        iv: user.iv,
+        salt: user.salt,
+    });
 });
+
 
 /* ===== GET PUBLIC KEY ===== */
 app.get("/public-key/:username", (req, res) => {
