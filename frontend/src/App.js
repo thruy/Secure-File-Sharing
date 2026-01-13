@@ -1,41 +1,54 @@
-import './App.css';
+import { useEffect, useState } from "react";
+import LoginBox from "./LoginBox";
+import RegisterBox from "./RegisterBox";
+import FileApp from "./FileLoad";
+import "./App.css";
 
 function App() {
+  const SERVER = "http://localhost:3000";
+  const [view, setView] = useState("login"); // login | register | app
+  const [currentUser, setCurrentUser] = useState(
+    localStorage.getItem("user")
+  );
+
+  useEffect(() => {
+    if (currentUser) setView("app");
+  }, [currentUser]);
+
+  const logout = () => {
+    localStorage.clear();
+    setCurrentUser(null);
+    setView("login");
+  };
+
   return (
-    <div className="App">
-      {/* login box */}
-      <div class="card" id="loginBox">
-        <h2>🔐 Secure File Sharing</h2>
-        <p class="small">End-to-End Encrypted</p>
-        <input id="loginUser" placeholder="Username" />
-        <input id="loginPass" type="password" placeholder="Password" />
-        <button class="primary" onclick="login()">Đăng nhập</button>
-        <p class="small"> Chưa có tài khoản? <a href="#" onclick="showRegister()">Đăng ký</a></p>
-      </div>
+    <>
+      {view === "login" && (
+        <LoginBox
+          SERVER={SERVER}
+          onLogin={(user) => {
+            setCurrentUser(user);
+            setView("app");
+          }}
+          showRegister={() => setView("register")}
+        />
+      )}
 
-      {/* register box */}
-      <div class="card hidden" id="registerBox">
-        <h2>Đăng ký</h2>
-        <input id="regUser" placeholder="Username" />
-        <input id="regPass" type="password" placeholder="Password" />
-        <input id="regPass2" type="password" placeholder="Confirm password" />
-        <button class="primary" onclick="register()">Đăng ký</button>
-        <button class="secondary" onclick="showLogin()">Quay lại</button>
-      </div>
+      {view === "register" && (
+        <RegisterBox
+          SERVER={SERVER}
+          showLogin={() => setView("login")}
+        />
+      )}
 
-      {/* app box */}
-      <div class="card hidden" id="appBox">
-        <div class="topbar">
-          <b>👤 <span id="currentUserSpan"></span></b>
-          <button class="secondary" onclick="logout()">Logout</button>
-        </div>
-        <input type="file" id="fileInput" />
-        <input id="receiver" placeholder="Người nhận (username)" />
-        <button class="primary" onclick="uploadFile()">Upload & Encrypt 🔒</button>
-        <h3>File được chia sẻ</h3>
-        <div id="fileList"></div>
-      </div>
-    </div>
+      {view === "app" && (
+        <FileApp
+          SERVER={SERVER}
+          currentUser={currentUser}
+          logout={logout}
+        />
+      )}
+    </>
   );
 }
 
